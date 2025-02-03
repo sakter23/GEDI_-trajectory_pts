@@ -1,0 +1,63 @@
+import h5py
+import os
+import glob
+import geopandas as gpd
+import pandas as pd
+from shapely.geometry import Point
+
+# Folder containing GEDI HDF5 files
+input_folder = r'F:\GEDI_Dataset'
+
+# Folder to save extracted Shapefiles
+output_folder = r'F:\GEDI_Dataset_Shapefiles'
+os.makedirs(output_folder, exist_ok=True)  # Create output folder if it doesn't exist
+
+# Get all HDF5 files in the input folder
+h5_files = glob.glob(os.path.join(input_folder, "*.h5"))
+
+# Check if any files are found
+if not h5_files:
+    print("No HDF5 files found in the folder.")
+    exit()
+
+# Process each file
+for file_path in h5_files:
+    file_name = os.path.basename(file_path).replace(".h5", ".shp")  # Output Shapefile name
+    output_file = os.path.join(output_folder, file_name)
+
+    print(f"Processing file: {os.path.basename(file_path)}")
+
+    with h5py.File(file_path, "r") as f:
+        # List available beams
+        beam_list = [key for key in f.keys() if key.startswith("BEAM")]
+        print(f"Available beams in {os.path.basename(file_path)}: {beam_list}")
+
+        all_data = []  # Store data from all beams
+
+        for beam in beam_list:
+            try:
+                # Extract latitude, longitude, and elevation
+                lat = f[f"{beam}/lat_lowestmode"][:]
+                lon = f[f"{beam}/lon_lowestmode"][:]
+                elev = f[f"{beam}/elev_lowestmode"][:]
+
+                # Create a DataFrame
+                df = pd.DataFrame({"Latitude": lat, "Longitude": lon, "Elevation": elev, "Beam": beam})
+
+                # Convert to GeoDataFrame with geometry points
+                df["geometry"] = df.apply(lambda row: Point(row["Longitude"], row["Latitude"]), axis=1)
+                gdf = gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326")  # WGS 84 projection
+
+                all_data.append(gdf)
+                print(f"Extracted {len(lat)} points from {beam} in {os.path.basename(file_path)}")
+
+            except KeyError as e:
+                print(f"Missing dataset in {beam} of {os.path.basename(file_path)}: {e}")
+
+        # Save as a Shapefile
+        if all_data:
+            final_gdf = gpd.GeoDataFrame(pd.concat(all_data, ignore_index=True))
+            final_gdf.to_file(output_file, driver="ESRI Shapefile")
+            print(f"Saved extracted data to {output_file}")
+
+print("Processing completed for all files.")
