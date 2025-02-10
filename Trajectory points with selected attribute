@@ -92,7 +92,7 @@ gpkg_file <- file.path(outdir="F:/RA Work Spring 2025/R_GEDI/GEDI to point", gsu
 sf::write_sf(level2AM_spdf, gpkg_file)
 }
 
-################################################Clipping and merging#############################################
+################################################Clipping for study region and merging#############################################
 library(sf)
 
 # Define the directory where your GeoPackages (or shapefiles) are stored
